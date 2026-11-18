@@ -113,6 +113,7 @@
   }
 
   function render() {
+    if (S.poll) { clearInterval(S.poll); S.poll = null; }
     if (tg && tg.BackButton) { if (S.stack.length) tg.BackButton.show(); else tg.BackButton.hide(); }
     window.scrollTo(0, 0);
     app.innerHTML = '<div class="loader" aria-label="Yuklanmoqda"></div>';
@@ -161,12 +162,30 @@
       '<div class="row"><span class="num">3</span><span>To\'lovdan keyin barcha darslar ochiladi</span></div></div>' +
       action;
 
+    // Пока заявка ждёт одобрения — проверяем статус каждые 7 секунд
+    // и сами открываем уроки, как только админ откроет доступ.
+    if (st === 'pending') {
+      var check = function () {
+        api('me').then(function (r) {
+          S.me = r.student;
+          if (r.student.status === 'active') {
+            haptic('success');
+            toast('Kirish ochildi! Xush kelibsiz');
+            go('home', {}, true);
+          } else if (r.student.status !== 'pending') {
+            render();
+          }
+        }).catch(function () { /* сеть пропала — попробуем позже */ });
+      };
+      S.poll = setInterval(check, 7000);
+    }
+
     on('[data-request]', function (btn) {
       btn.disabled = true;
       api('request').then(function (r) {
         S.me.status = r.status;
         haptic('success');
-        if (r.status === 'active') go('home', {}, true); else render();
+        if (r.status === 'active') go('home', {}, true); else go('closed', {}, true);
       }).catch(function (e) { btn.disabled = false; showError(e); });
     });
   };
